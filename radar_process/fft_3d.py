@@ -1,20 +1,17 @@
 import numpy as np
-import scipy.io as sio
-from scipy import signal
-import torch
-import torch.nn as nn
-from einops.layers.torch import Rearrange
-from scipy.constants import c as speed_of_light
-
 import plotly.graph_objects as go
+import torch
+from einops.layers.torch import Rearrange
+from scipy import signal
+from scipy.constants import c as speed_of_light
+from torch import nn
 
-from utils.ffts_torch import RangeFFT, DopplerFFT, AngleFFT, PhaseCompensation
-from utils.CFAR_torch import CFAR_OSCA_2D_new
+from utils.ffts_torch import AngleFFT, DopplerFFT, PhaseCompensation, RangeFFT
 
 
 class RadarData(nn.Module):
     def __init__(self, raw_shape, fft_shape, cfar_module=None):
-        """
+        """雷达数据 3D-FFT 处理。
 
         Args:
             raw_shape: (tx, rx, chirps, samples)
@@ -95,17 +92,25 @@ class Plot:
         self.vel_grid = self._get_vel_grid()
         self.ang_grid = self._get_ang_grid()
 
-    def plot(self, x: torch.Tensor, mean_dim=0):
+    def plot(self, x: torch.Tensor, mean_dim=0, *, z_bounds=None, height=400, width=700):
         """绘制热力图
 
         Args:
             x: (tx * rx, chirps, samples)，不区分是复数还是实数
             mean_dim: 计算均值的维度
+
+            z_bounds: 热力图的 z 轴范围。默认为 [-10, 25]
+            height: 热力图高度
+            width: 热力图宽度
         """
         assert mean_dim in [0, 1, 2]
         assert len(x.shape) == 3
+
+        if z_bounds is None:
+            z_bounds = [-10, 25]
+
         x = x.cpu().numpy()
-        z = 20 * np.log10(np.mean(np.abs(x + 10e-8), axis=mean_dim))
+        z = 20 * np.log10(np.mean(np.abs(x + 1e-8), axis=mean_dim))
         if mean_dim == 0:
             title = "Range-Doppler Heatmap"
             xaxis = dict(title="Doppler")
@@ -134,15 +139,17 @@ class Plot:
                 y=y,
                 z=z,
                 colorscale="Viridis",
-                colorbar=dict(title="dB"),
+                colorbar={"title": "dB"},
+                zmin=z_bounds[0],
+                zmax=z_bounds[1],
             )
         )
         fig.update_layout(
             title=title,
             xaxis=xaxis,
             yaxis=yaxis,
-            height=400,
-            width=700,
+            height=height,
+            width=width,
         )
         fig.show()
 
@@ -175,16 +182,24 @@ class Plot:
         return ang_grid
 
 
-def plot(x, mean_dim=0):
+def plot(x, mean_dim=0, *, z_bounds=None, height=400, width=700):
     """进行 3D-FFT 后，可用该函数绘制热力图
 
     Args:
         x: (tx * rx, chirps, samples)，不区分是复数还是实数
         mean_dim: 计算均值的维度
+
+        z_bounds: 热力图的 z 轴范围。默认为 [-10, 25]
+        height: 热力图高度
+        width: 热力图宽度
     """
     assert mean_dim in [0, 1, 2]
     assert len(x.shape) == 3
-    z = 20 * np.log10(torch.mean(torch.abs(x), dim=mean_dim).cpu().numpy())
+
+    if z_bounds is None:
+        z_bounds = [-10, 25]
+
+    z = 20 * np.log10(torch.mean(torch.abs(x + 1e-8), dim=mean_dim).cpu().numpy())
     if mean_dim == 0:
         title = "Range-Doppler Heatmap"
         xaxis = dict(title="Doppler")
@@ -205,14 +220,16 @@ def plot(x, mean_dim=0):
         go.Heatmap(
             z=z,
             colorscale="Viridis",
-            colorbar=dict(title="dB"),
+            colorbar={"title": "dB"},
+            zmin=z_bounds[0],
+            zmax=z_bounds[1],
         )
     )
     fig.update_layout(
         title=title,
         xaxis=xaxis,
         yaxis=yaxis,
-        height=400,
-        width=700,
+        height=height,
+        width=width,
     )
     fig.show()
