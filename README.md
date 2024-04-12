@@ -12,6 +12,12 @@ RangeFFT -> DopplerFFT -> cfar（可选） -> PhaseCompensation -> AngleFFT
 
 ## 使用方法
 
+### 安装
+
+将本项目 clone 到本地，使用 `pip install -e .` 安装。
+
+### 代码示例
+
 准备好雷达输入，维度应为 `[batch, tx, rx, chirp, sample]`。
 
 实例化网络：
