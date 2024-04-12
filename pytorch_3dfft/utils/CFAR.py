@@ -38,79 +38,7 @@ class _CFARBase_2D(nn.Module):
         self.n = self.kernel.sum().item()
 
 
-class CFAR_OSCA_2D_old(_CFARBase_2D):
-    """
-    针对 range-doppler 的二维 CFAR。
-    """
-    def __init__(self, g, t, pfa=None, k=None):
-        """针对 range-doppler 的二维 CFAR。
-        
-        输入数据维度：[batch, fft_vel, fft_rang]
-
-        Args:
-            g: 守护单元数量
-            t: 训练单元数量
-            pfa: 虚警概率
-            k: 噪声单元的选择次序（升序排序）。一般是训练数量 n 的 3/4
-        """
-        super(CFAR_OSCA_2D, self).__init__(g, t, pfa)
-
-        self.os_kernel = torch.ones(self.kernel_size[1], dtype=bool)
-        self.os_kernel[self.t[1] : self.t[1] + 2 * self.g[1] + 1] = False
-        self.ca_kernel = torch.ones(self.kernel_size[0], dtype=bool)
-        self.ca_kernel[self.t[0] : self.t[0] + 2 * self.g[0] + 1] = False
-        self.ca_kernel = rearrange(self.ca_kernel, "v -> 1 1 v 1")
-
-        self.os_n = self.os_kernel.sum().item()
-        self.ca_n = self.ca_kernel.sum().item()
-
-        self.k = self.os_n * 3 / 4 if k is None else k
-
-        self.os_alpha = os_cfar_threshold(self.k, self.os_n, self.pfa)
-        self.os_alpha = np.sqrt(self.os_alpha)
-
-        # os_cfar 专用
-        pad_width = (self.g[1] + self.t[1], self.g[1] + self.t[1], 0, 0)
-        self.layer_os_pad = nn.CircularPad2d(pad_width)
-        unfold_kernel_size = (1, self.os_kernel.shape[0])
-        self.layer_os_unfold = nn.Unfold(kernel_size=unfold_kernel_size, stride=1)
-
-        # ca_cfar 专用
-        pad_width = (0, 0, self.g[0] + self.t[0], self.g[0] + self.t[0])
-        self.layer_ca_pad = nn.CircularPad2d(pad_width)
-
-        self.rearrange_bvr_to_b1vr = Rearrange("b v r -> b 1 v r")
-        self.rearrange_b1vr_to_bvr = Rearrange("b 1 v r -> b v r")
-
-    @torch.no_grad()
-    def forward(self, data, dim=-1):
-        """
-        输入数据维度：[batch, fft_vel, fft_rang]
-        """
-        batch_size, fft_vel, fft_rang = data.size()
-
-        data = self.layer_os_pad(data)
-        # data = rearrange(data, "b v r -> b 1 v r")
-        data = self.rearrange_bvr_to_b1vr(data)
-        windows = self.layer_os_unfold(data)
-        windows = windows[:, self.os_kernel, :]
-
-        miu = windows.topk(int(self.os_n - self.k), dim=1).values[:, -1]
-        miu = miu.view(batch_size, fft_vel, fft_rang)
-        os_result = self.os_alpha * miu
-
-        # 再进行 CA
-        padded = self.layer_ca_pad(os_result)
-        # padded = rearrange(padded, "b v r -> b 1 v r")
-        padded = self.rearrange_bvr_to_b1vr(padded)
-        ca_result = F.conv2d(padded, self.ca_kernel.type_as(data)) / self.ca_n
-        # ca_result = rearrange(ca_result, "b 1 v r -> b v r")
-        ca_result = self.rearrange_b1vr_to_bvr(ca_result)
-
-        return ca_result
-
-
-class CFAR_OSCA_2D_new(_CFARBase_2D):
+class CFAR_OSCA_2D(_CFARBase_2D):
     """
     针对 range-doppler 的二维 CFAR。
     """
@@ -183,56 +111,6 @@ class CFAR_OSCA_2D_new(_CFARBase_2D):
         ca_result = self.rearrange_b1vr_to_bvr(ca_result)
 
         return self.complex_abs_sub_2d(x, ca_result)
-
-
-
-class CFAR_OS_2D(_CFARBase_2D):
-    def __init__(self, g, t, pfa=None, k=None):
-        """
-        2D OS-CFAR detector
-        输入数据维度：[fft_vel, fft_rang]
-
-        Args:
-            data: 2D data。应为实数数据
-            g: 守护单元数量
-            t: 训练单元数量
-            pfa: 虚警概率
-            k: 噪声单元的选择次序（升序排序）。一般是训练数量 n 的 3/4
-        """
-        super(CFAR_OS_2D, self).__init__(g, t, pfa)
-
-        self.k = self.n * 3 / 4 if k is None else k
-        self.alpha = os_cfar_threshold(self.k, self.n, self.pfa)
-
-        self.pad_width = (
-            self.g[0] + self.t[0],
-            self.g[0] + self.t[0],
-            self.g[1] + self.t[1],
-            self.g[1] + self.t[1],
-        )
-        self.layer_pad = nn.CircularPad2d(self.pad_width)
-
-    @torch.no_grad()
-    def forward(self, data):
-        """
-        输入数据维度：[batch, fft_vel, fft_rang]
-        """
-        shape = data.shape
-
-        data = self.layer_pad(data)
-        cfar_result = torch.zeros(shape[1:])
-        for i in range(self.pad_width[0], shape[1] + self.pad_width[1]):
-            for j in range(self.pad_width[2], shape[2] + self.pad_width[3]):
-                window = data[
-                    :,
-                    i - self.pad_width[0] : i + self.pad_width[1] + 1,
-                    j - self.pad_width[2] : j + self.pad_width[3] + 1,
-                ]
-                window = window[:, self.kernel]
-                miu = window.topk(self.n - self.k, dim=1).values[:, -1]
-                cfar_result[i - self.pad_width[0], j - self.pad_width[2]] = miu
-
-        return self.alpha * cfar_result
 
 
 def os_cfar_threshold(k, n, pfa):

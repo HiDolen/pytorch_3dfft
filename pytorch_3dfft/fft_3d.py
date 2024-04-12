@@ -6,7 +6,7 @@ from scipy import signal
 from scipy.constants import c as speed_of_light
 from torch import nn
 
-from utils.ffts_torch import AngleFFT, DopplerFFT, PhaseCompensation, RangeFFT
+from .utils.ffts import AngleFFT, DopplerFFT, PhaseCompensation, RangeFFT
 
 
 class RadarData(nn.Module):
@@ -189,7 +189,7 @@ def plot(x, mean_dim=0, *, z_bounds=None, height=400, width=700):
         x: (tx * rx, chirps, samples)，不区分是复数还是实数
         mean_dim: 计算均值的维度
 
-        z_bounds: 热力图的 z 轴范围。默认为 [-10, 25]
+        z_bounds: 热力图的 z 轴范围
         height: 热力图高度
         width: 热力图宽度
     """
@@ -197,7 +197,7 @@ def plot(x, mean_dim=0, *, z_bounds=None, height=400, width=700):
     assert len(x.shape) == 3
 
     if z_bounds is None:
-        z_bounds = [-10, 25]
+        z_bounds = [None, None]
 
     z = 20 * np.log10(torch.mean(torch.abs(x + 1e-8), dim=mean_dim).cpu().numpy())
     if mean_dim == 0:
