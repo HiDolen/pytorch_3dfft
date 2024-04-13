@@ -67,7 +67,7 @@ class Plot:
         assert len(x.shape) == 3
 
         if z_bounds is None:
-            z_bounds = [-10, 25]
+            z_bounds = [None, None]
 
         x = to_numpy(x)
 
