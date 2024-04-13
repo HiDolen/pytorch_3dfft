@@ -3,6 +3,8 @@ import plotly.graph_objects as go
 import torch
 from scipy.constants import c as speed_of_light
 
+from .utils.type_conversion import to_numpy
+
 
 class Plot:
     """进行 3D-FFT 后，可用该函数绘制热力图。
@@ -67,7 +69,8 @@ class Plot:
         if z_bounds is None:
             z_bounds = [-10, 25]
 
-        x = x.cpu().numpy()
+        x = to_numpy(x)
+
         z = 20 * np.log10(np.mean(np.abs(x + 1e-8), axis=mean_dim))
         if mean_dim == 0:
             title = "Range-Doppler Heatmap"
@@ -161,6 +164,8 @@ def plot(x, mean_dim=0, *, z_bounds=None, height=400, width=700):
 
     if z_bounds is None:
         z_bounds = [None, None]
+
+    x = to_numpy(x)
 
     z = 20 * np.log10(torch.mean(torch.abs(x + 1e-8), dim=mean_dim).cpu().numpy())
     if mean_dim == 0:
