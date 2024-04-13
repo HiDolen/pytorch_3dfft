@@ -131,7 +131,7 @@ class Plot:
         """
         # # 用公式 v = dop * lambda / 2，转换为 velocity-fft 的坐标轴
         dop_grid = np.linspace(
-            -1 / self.pulse_duration / 2, 1 / self.pulse_duration / 2, self.fft_vel, endpoint=False
+            -1 / self.pulse_period / 2, 1 / self.pulse_period / 2, self.fft_vel, endpoint=False
         )
         vel_grid = dop_grid * speed_of_light / self.center_freq / 2
         return vel_grid
