@@ -167,7 +167,7 @@ def plot(x, mean_dim=0, *, z_bounds=None, height=400, width=700):
 
     x = to_numpy(x)
 
-    z = 20 * np.log10(torch.mean(torch.abs(x + 1e-8), dim=mean_dim).cpu().numpy())
+    z = 20 * np.log10(np.mean(np.abs(x + 1e-8), axis=mean_dim))
     if mean_dim == 0:
         title = "Range-Doppler Heatmap"
         xaxis = dict(title="Doppler")
