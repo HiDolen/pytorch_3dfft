@@ -47,9 +47,7 @@ class Plot:
         self.vel_grid = self._get_vel_grid()
         self.ang_grid = self._get_ang_grid()
 
-    def plot(
-        self, x: torch.Tensor, mean_dim=0, *, z_bounds=None, height=400, width=700
-    ):
+    def plot(self, x: torch.Tensor, mean_dim=0, *, z_bounds=None, height=None, width=None):
         """绘制热力图
 
         Args:
@@ -145,7 +143,7 @@ class Plot:
         return ang_grid
 
 
-def plot(x, mean_dim=0, *, z_bounds=None, height=400, width=700):
+def plot(x, mean_dim=0, *, z_bounds=None, height=None, width=None):
     """进行 3D-FFT 后，可用该函数绘制热力图
 
     Args:
