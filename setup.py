@@ -12,5 +12,5 @@ setup(
         "scipy",
     ],
     author="HiDolen",
-    author_email="820859278@qq.com"
+    author_email="hidolen@163.com"
 )
